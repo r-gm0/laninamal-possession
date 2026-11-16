@@ -18,11 +18,11 @@ persists, and changes only on sustained control. So we model it as a state seque
 2. **A hidden-state model** with three states, H (home), A (away) and D (dead). We decode the
    single most likely sequence with Viterbi, under two constraints that encode "control must
    be sustained":
-   * a **minimum duration** per state (3 s for a possession, 1 s for a dead ball). This is
-     implemented exactly by expanding each state into a chain of sub-states (an
-     explicit-duration HMM), so a short touch can never become a possession;
-   * a **penalty (in nats) for each change of state**, which sets how much accumulated evidence
-     a change of possession needs.
+    * a **minimum duration** per state (3 s for a possession, 1 s for a dead ball). This is
+      implemented exactly by expanding each state into a chain of sub-states (an
+      explicit-duration HMM), so a short touch can never become a possession;
+    * a **penalty (in nats) for each change of state**, which sets how much accumulated
+      evidence a change of possession needs.
 
 We chose this over a learned sequence model (e.g. a recurrent network) because there is no
 labelled training data for the provided match, the external data is small (3 matches), and
