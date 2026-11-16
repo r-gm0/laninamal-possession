@@ -1,0 +1,158 @@
+seed: 0
+data:
+  cache_dir: C:/mtah2027/cache
+features:
+  interp_max_gap: 12
+  crowd_radius_m: 5.0
+  ball_speed_smooth: 5
+  out_margin_m: 0.5
+  player_speed_clip_mps: 12.0
+  player_speed_smooth: 25
+emission:
+  dist_scale_m: 1.5
+  crowd_beta: 0.15
+  max_logit: 0.75
+  control_radius_m: 1.0
+  prox_decay_m: 3.0
+  ball_speed_free_mps: 8.0
+  ball_speed_decay_mps: 6.0
+  weight_observed: 1.0
+  weight_interpolated: 0.5
+  dead_out_of_bounds: 3.0
+  alive_ball_near_player: 0.5
+dead:
+  fps: 25
+  walk_speed_mps: 2.0
+  w_players_slow: 0.2
+  ball_still_mps: 0.5
+  w_ball_still_and_slow: 0.8
+  long_missing_s: 3.0
+  w_long_missing_and_slow: 0.0
+  ball_fast_mps: 10.0
+  w_fast_ball_alive: 0.5
+  w_set_piece: 0.6
+  gate_slow_by_control: true
+  use_smart_tagging: true
+tagging:
+  set_piece_types:
+  - Throw-in
+  - Corner Kick
+  - Goal Kick
+  - Free Kick
+  - Kick Off (After Goal)
+  - Kick Off (Start)
+  set_piece_pre_s: 2.0
+  set_piece_frac: 0.5
+  use_team_phases: true
+  phase_weights:
+    BUILD UP: 0.08
+    PROGRESSION: 0.08
+    CREATING CHANCES: 0.08
+    ATTACKING TRANSITION: 0.08
+    BALL IN FINAL THIRD: 0.06
+    BALL IN THE BOX: 0.04
+    LONG BALL: 0.04
+    DEFENDING IN DEFENSIVE THIRD: -0.06
+    DEFENDING IN MIDDLE THIRD: -0.06
+    DEFENDING IN ATTACKING THIRD: -0.06
+    DEFENSIVE TRANSITION: -0.06
+  phase_cap: 0.2
+  team_name_overrides: {}
+  use_transition_hints: true
+  transition_codes:
+  - ATTACKING TRANSITION
+  - DEFENSIVE TRANSITION
+  transition_pre_s: 3.0
+  transition_post_s: 1.0
+  transition_switch_bonus: 3.0
+hmm:
+  min_dur_possession: 75
+  min_dur_dead: 25
+  switch_penalty: 4.0
+  dead_enter_penalty: 6.0
+  dead_exit_penalty: 6.0
+  init_logprior:
+    H: -10.0
+    A: -10.0
+    D: 0.0
+xpolicy:
+  enabled: false
+  min_no_evidence_frames: 75
+  classes:
+  - H
+  - A
+external:
+  reference:
+    require_control: true
+    controlled_actions:
+    - PASS
+    - CARRY
+    - SHOT
+    - SET PIECE
+    min_keep_s: 3.0
+  degrade:
+    player_noise_m: 0.15
+    ball_noise_m: 0.15
+    id_switch_every_s: 30.0
+    player_drop_rate: 0.05
+    player_drop_len: 25
+    ball_missing_target: 0.41
+    ball_drop_len: 20
+    ball_drop_crowd_gain: 0.5
+    fill_clean_gaps: true
+    fill_mode: linear
+    noise_smooth_frames: 50
+tuning:
+  min_gain: 0.01
+  grid:
+    hmm.switch_penalty:
+    - 4.0
+    - 8.0
+    - 12.0
+    - 16.0
+    hmm.min_dur_possession:
+    - 25
+    - 50
+    - 75
+    - 100
+    hmm.min_dur_dead:
+    - 12
+    - 25
+    - 50
+    hmm.dead_enter_penalty:
+    - 3.0
+    - 6.0
+    - 10.0
+    hmm.dead_exit_penalty:
+    - 3.0
+    - 6.0
+    - 10.0
+    emission.dist_scale_m:
+    - 0.75
+    - 1.5
+    - 3.0
+    emission.control_radius_m:
+    - 1.0
+    - 1.5
+    - 2.5
+    emission.max_logit:
+    - 0.75
+    - 1.5
+    - 3.0
+    dead.w_ball_still_and_slow:
+    - 0.0
+    - 0.4
+    - 0.8
+    - 1.6
+    dead.w_players_slow:
+    - 0.0
+    - 0.2
+    - 0.4
+    dead.w_long_missing_and_slow:
+    - 0.0
+    - 0.3
+    - 0.6
+    features.interp_max_gap:
+    - 0
+    - 12
+    - 25

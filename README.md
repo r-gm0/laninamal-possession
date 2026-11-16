@@ -1,3 +1,25 @@
+> ## Our submission: possession by duration-constrained Viterbi
+>
+> This fork adds a possession model in `src/`: tracking features → per-frame evidence → H/A/D
+> Viterbi decoding with minimum durations, with Smart Tagging as soft evidence. Design, data
+> used and limitations: **[docs/TECHNICAL.md](docs/TECHNICAL.md)**. No match data is in this
+> repository.
+>
+> ```bash
+> py -3.12 -m venv .venv            # Python 3.12; then activate it
+> pip install -r requirements.txt   # pinned: numpy, pandas, pyyaml
+> # unpack the challenge data into data/ (see DATA.md), or anywhere + set MTAH_DATA_DIR
+> # optional: MTAH_CACHE_DIR = folder for the parsed-tracking cache (default ./cache)
+> python -m src.run --out submissions/laninamal.csv       # regenerates the exact file
+> python evaluation/validate_submission.py submissions/laninamal.csv
+> ```
+>
+> Team **laninamal**. Expected output SHA-256 starts with `7123da13a9da5a55`.
+> Parameters: `src/config.yaml`. Validation on other matches (Metrica Sports open sample data,
+> github.com/metrica-sports/sample-data, used with acknowledgement; download it into
+> `data_external/metrica/`): `python -m src.validate`, `python -m src.tune`.
+> Software tests on synthetic data: `python -m tests.test_synthetic`, `python -m tests.test_external`.
+
 # More than a Hack 2027 — Phase 1: Ball Possession
 
 **Organised by [Metrica Sports](https://metrica-sports.com), [FC Barcelona](https://www.fcbarcelona.com)

@@ -1,0 +1,160 @@
+# All hyper-parameters of the pipeline live here. Nothing in src/ hard-codes a tunable number.
+#
+# IMPORTANT: none of these values may be chosen by looking at scores on the public 5-minute
+# ground truth (frames 11185-18684). That window is a pipeline check only (RULES.md). Values are
+# football-motivated defaults until Stage 5 fits them on OTHER matches.
+
+seed: 0                       # nothing is random yet; kept so future stages stay deterministic
+
+data:
+  cache_dir: cache            # parsed ATD as .npz (frame-level, gitignored); env MTAH_CACHE_DIR overrides
+
+features:
+  # Ball gaps up to this many frames are linearly interpolated (25 frames = 1 s).
+  interp_max_gap: 12
+  # Radius (m) for counting players of each team around the ball.
+  crowd_radius_m: 5.0
+  # Ball speed is computed from (interpolated) positions, smoothed over this many frames.
+  ball_speed_smooth: 5
+  # Margin (m) beyond the touch/goal line before the ball counts as "out".
+  out_margin_m: 0.5
+  # Collective player speed: per-slot speeds above this are identity-switch teleports, dropped.
+  player_speed_clip_mps: 12.0
+  player_speed_smooth: 25     # frames (1 s) of smoothing on the mean player speed
+
+emission:
+  # Logit of "home controls the ball" = (d_away - d_home) / dist_scale_m
+  #                                     + crowd_beta * (n_home_R - n_away_R), clipped to max_logit.
+  dist_scale_m: 1.5
+  crowd_beta: 0.15
+  max_logit: 0.75          # tuned on Metrica games (log E14); was 3.0 -> 1.5 -> 0.75
+  # Evidence weight decays when the nearest player is farther than control_radius_m
+  # (ball in flight / loose): w *= exp(-(d_min - control_radius_m)/prox_decay_m).
+  control_radius_m: 1.0          # tuned on Metrica games (log E14); was 2.5 -> 1.5 -> 1.0
+  prox_decay_m: 3.0
+  # ...and when the ball moves fast (a pass / shot is not control): w *= exp(-(v - v0)/v_decay).
+  ball_speed_free_mps: 8.0
+  ball_speed_decay_mps: 6.0
+  # Base weight by ball observation type. Missing ball -> 0 => neutral emission, state persists.
+  weight_observed: 1.0
+  weight_interpolated: 0.5
+  # Dead-ball evidence (Stage 1 is deliberately minimal; Stage 2 expands it).
+  dead_out_of_bounds: 3.0     # log-odds bonus for D when the ball is outside the pitch
+  alive_ball_near_player: 0.5 # log-odds bonus for H/A vs D when a ball is seen in play near a player
+
+dead:
+  # Stage 2: dead-ball evidence. Each w_* is a log-odds bonus for D; set to 0 to disable a term.
+  fps: 25
+  walk_speed_mps: 2.0         # mean player speed below this looks like a stoppage
+  w_players_slow: 0.1           # log E13/E16: 0.2 best externally but over-predicts D (54% on match); 0.1 compromise
+  ball_still_mps: 0.5
+  w_ball_still_and_slow: 0.8  # ball still AND players slow
+  long_missing_s: 3.0
+  w_long_missing_and_slow: 0.0  # OFF: fires during in-possession occlusions (see log E2)
+  ball_fast_mps: 10.0
+  w_fast_ball_alive: 0.5      # a fast ball (pass/shot/clearance) counts against D
+  w_set_piece: 0.6            # inside a Smart Tagging restart window
+  gate_slow_by_control: true  # slowness only counts when no player controls the ball
+  use_smart_tagging: true
+
+tagging:
+  # Which SET PIECES types give a dead-ball prior (empty list = all).
+  set_piece_types: [Throw-in, Corner Kick, Goal Kick, Free Kick, Kick Off (After Goal), Kick Off (Start)]
+  # Window relative to the tag: [start - pre_s, start + frac * (end - start)].
+  set_piece_pre_s: 2.0
+  set_piece_frac: 0.5
+
+  # Stage 3: phases with a Team as evidence of who has the ball. Weight per frame (nats, split
+  # +-w/2 between H and A). + : tagged Team has the ball. - : tagged Team is defending.
+  # Codes not listed (PLAYERS IN THE BOX, GOALS, SET PIECES) give no team evidence.
+  # Team == N/A (e.g. every throw-in) gives no team evidence; the tracking decides.
+  use_team_phases: true
+  phase_weights:
+    BUILD UP: 0.08
+    PROGRESSION: 0.08
+    CREATING CHANCES: 0.08
+    ATTACKING TRANSITION: 0.08
+    BALL IN FINAL THIRD: 0.06
+    BALL IN THE BOX: 0.04
+    LONG BALL: 0.04
+    DEFENDING IN DEFENSIVE THIRD: -0.06
+    DEFENDING IN MIDDLE THIRD: -0.06
+    DEFENDING IN ATTACKING THIRD: -0.06
+    DEFENSIVE TRANSITION: -0.06
+  phase_cap: 0.2              # |sum| of overlapping tags per frame is capped at this
+  team_name_overrides: {}     # e.g. {"Some Club": H} only if the fuzzy match fails (it errors)
+  # Transitions: near the start of these tags a direct H<->A switch costs less.
+  use_transition_hints: true
+  transition_codes: [ATTACKING TRANSITION, DEFENSIVE TRANSITION]
+  transition_pre_s: 3.0
+  transition_post_s: 1.0
+  transition_switch_bonus: 3.0  # nats removed from hmm.switch_penalty inside the hint window
+
+restart:
+  # Stage 2b: tracking-only restart detector (src/restart.py). At the first fast-ball frame after
+  # a calm stretch, the D -> H/A switch is cheaper. Off until validated (log E15).
+  enabled: false
+  kick_mps: 5.0                # ball faster than this = kicked
+  pre_s: 2.0                   # calm window before the kick
+  ball_slow_mps: 2.0           # observed ball never faster than this in the calm window
+  players_walk_mps: 2.0        # mean player speed in the calm window below this
+  switch_bonus: 4.0            # nats off the D -> H/A switch at a detected kick
+
+hmm:
+  # Minimum duration (frames) of a run of each state. 50 frames = 2 s.
+  min_dur_possession: 75     # 3 s; log E10/E11 (was 50)
+  min_dur_dead: 25
+  # Log-penalties (nats) for changing state; higher = fewer, longer possessions.
+  switch_penalty: 4.0         # H <-> A directly  [log E14: was 8.0]
+  dead_enter_penalty: 6.0     # H/A -> D
+  dead_exit_penalty: 6.0      # D -> H/A
+  # Generic football fact (not match-specific): every half begins with the ball dead before
+  # kick-off. Log-prior of each state at the first graded frame of a half.
+  init_logprior: {H: -10.0, A: -10.0, D: 0.0}
+
+xpolicy:
+  # Stage 4. X only inside a decoded H/A segment (never its first frame), on runs of at least
+  # this many frames with no evidence at all. Guaranteed (asserted) not to change spellF1; it
+  # only trades macroF1. Ungraded frames are always X.
+  enabled: false              # OFF by default: on synthetic it only cost macroF1 (log E4). Re-check in Stage 5
+  min_no_evidence_frames: 75   # 3 s
+  classes: [H, A]
+
+external:
+  # Stage 5: how other matches' clean tracking is degraded to look like the challenge ATD.
+  # Targets come from DATA.md (ball missing on 41% of graded frames, ~20.5 tracked players,
+  # identity switches, no player ids). Never from the challenge ground truth.
+  reference:                     # event -> possession reference, following CHALLENGE.md wording
+    require_control: true        # a touch / deflection without control does not change possession
+    controlled_actions: [PASS, CARRY, SHOT, SET PIECE]
+    min_keep_s: 3.0              # "a player keeps the ball for a few seconds"
+  degrade:
+    player_noise_m: 0.15         # calibrated to real ATD speed distribution (log E12)
+    ball_noise_m: 0.15
+    id_switch_every_s: 30.0
+    player_drop_rate: 0.05       # fraction of frames a slot is missing
+    player_drop_len: 25          # mean dropout length (frames)
+    ball_missing_target: 0.41
+    ball_drop_len: 20            # mean ball dropout burst (frames)
+    ball_drop_crowd_gain: 0.5    # dropouts more likely with more players within 3 m
+    fill_clean_gaps: true        # fill the clean data's out-of-play ball gaps before degrading (else missing = dead leaks)
+    fill_mode: linear            # linear (ball carried to the restart spot) | hold; log E12
+    noise_smooth_frames: 50      # correlated noise (real ATD speeds look like clean tracking); log E12
+
+tuning:
+  # Stage 5 coordinate search over external games only (src/tune.py). Coarse grids on purpose:
+  # with ~3 games, a fine grid would fit noise.
+  min_gain: 0.01
+  grid:
+    hmm.switch_penalty: [4.0, 8.0, 12.0, 16.0]
+    hmm.min_dur_possession: [25, 50, 75, 100]
+    hmm.min_dur_dead: [12, 25, 50]
+    hmm.dead_enter_penalty: [3.0, 6.0, 10.0]
+    hmm.dead_exit_penalty: [3.0, 6.0, 10.0]
+    emission.dist_scale_m: [0.75, 1.5, 3.0]
+    emission.control_radius_m: [1.0, 1.5, 2.5]
+    emission.max_logit: [0.75, 1.5, 3.0]
+    dead.w_ball_still_and_slow: [0.0, 0.4, 0.8, 1.6]
+    dead.w_players_slow: [0.0, 0.2, 0.4]
+    dead.w_long_missing_and_slow: [0.0, 0.3, 0.6]
+    features.interp_max_gap: [0, 12, 25]

@@ -62,3 +62,10 @@ __pycache__/
 venv/
 env/
 .DS_Store
+
+# -- team additions: frame-level derived data and outputs never leave this machine --------------
+cache/
+data_external/
+submissions/
+experiments/*.csv
+experiments/*.npz
