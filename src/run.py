@@ -20,7 +20,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from games import GAME, GAMES, half_video_blocks, source_frames  # noqa: E402
 from src import atd as atd_mod  # noqa: E402
-from src import emissions, features, restart, tagging, viterbi, xpolicy  # noqa: E402
+from src import emissions, features, learned, restart, tagging, viterbi, xpolicy  # noqa: E402
 
 LABELS = np.array(["H", "A", "D"])
 # Transitions a Smart Tagging "transition" hint makes cheaper: H <-> A only.
@@ -81,7 +81,14 @@ def decode_match(atd, cfg, blocks, n, pitch, fps=25, events=None, feat=None):
         if tc.get("use_transition_hints"):
             hint, feat["n_transition_hints"] = tagging.transition_hints(events, n, cfg, fps)
             bonus = hint * tc["transition_switch_bonus"]
-    E = emissions.compute(feat, cfg)
+    if cfg["emission"].get("mode", "rules") == "learned":
+        # log E17: tracking evidence from trees trained on external games; Smart Tagging on top
+        lm = learned.load_model(os.path.join(ROOT, cfg["emission"]["learned_model"]))
+        E = learned.compute(atd, pitch, lm)
+        E[:, 2] += cfg["emission"].get("learned_dead_bias", 0.0)   # log E19
+        E = emissions.add_tagging(E, feat, cfg, cfg["tagging"].get("learned_phase_scale", 1.0))
+    else:
+        E = emissions.compute(feat, cfg)
     min_dur, penalty, prior = hmm_params(cfg)
     if cfg.get("restart", {}).get("enabled"):
         B, feat["n_restart_kicks"] = restart.bonus_matrix(feat, cfg, fps)

@@ -89,6 +89,9 @@ def _features(name, deg, cfg):
 
 def score(cfg, prepared, with_baseline=False, verbose=True):
     ecfg = external_cfg(cfg)
+    if verbose and ecfg["emission"].get("mode") == "learned":
+        print("  NOTE: learned emissions were trained on these games -> in-sample scores. "
+              "Held-out (leave-one-game-out) scores: python -m src.train_learned")
     rows = []
     for name, deg, ref, periods in prepared:
         lab, _ = run.decode_match(deg, ecfg, periods, len(ref), PITCH, 25, None,

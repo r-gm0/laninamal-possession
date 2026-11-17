@@ -69,6 +69,7 @@ def main():
     args = ap.parse_args()
 
     cfg = run.load_config(args.config)
+    cfg["emission"]["mode"] = "rules"   # this search fits the rule parameters (logs E1-E16)
     grid, min_gain = cfg["tuning"]["grid"], cfg["tuning"]["min_gain"]
     prepared = validate.prepare(cfg)
 

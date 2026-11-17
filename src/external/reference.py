@@ -161,10 +161,35 @@ def degrade(atd, periods, pitch, seed, cfg):
         for a in np.flatnonzero(u):
             players[a:a + int(rng.exponential(dc["player_drop_len"])) + 1, s] = np.nan
 
-    # ball dropouts: bursty, more likely in crowds; hazard scaled to hit the target fraction
+    # ball jitter (log E18): the real ATD ball position shakes frame to frame, so a ball is almost
+    # never "still" over 3 frames (5% vs 13-15% with smooth noise only). i.i.d. noise, metres.
+    if dc.get("ball_jitter_m", 0) > 0:
+        ball += rng.normal(0.0, dc["ball_jitter_m"], ball.shape) / np.array([L, W])
+
     graded = np.zeros(n, dtype=bool)
     for _, a, b in periods:
         graded[a:b + 1] = True
+    if dc.get("ball_drop_mode", "bursty") == "gaps":
+        # log E18: the real ATD loses the ball in ~150 LONG gaps (median ~11 s), not in short
+        # bursts. Gap lengths are drawn from the real gap-length deciles (aggregate, no labels),
+        # placed uniformly at random -- independent of the game state, so "ball missing" stays
+        # uninformative about dead ball -- until the target fraction of graded frames is missing.
+        qs = np.asarray(dc["ball_gap_deciles_frames"], dtype=float)
+        drop = np.isnan(ball[:, 0]) & graded
+        while drop[graded].mean() < dc["ball_missing_target"]:
+            ln = int(round(np.interp(rng.random(), np.linspace(0, 1, len(qs)), qs)))
+            a = int(rng.integers(0, n))
+            if drop[max(0, a - 1):a + max(1, ln) + 1].any():
+                continue                      # keep gaps separate, as in the real ATD
+            drop[a:a + max(1, ln)] = True
+        ball[drop] = np.nan
+        out = dict(atd)
+        out["ball"] = ball.astype(np.float32)
+        out["players"] = players.astype(np.float32)
+        out["pspeed"] = np.full((n, S), np.nan, np.float32)
+        return out, float(drop[graded].mean())
+
+    # ball dropouts: bursty, more likely in crowds; hazard scaled to hit the target fraction
     bx, by = ball[:, 0] * L, ball[:, 1] * W
     with np.errstate(invalid="ignore"):
         d = np.hypot(players[:, :, 0] * L - bx[:, None], players[:, :, 1] * W - by[:, None])

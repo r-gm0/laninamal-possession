@@ -23,6 +23,12 @@ features:
   player_speed_smooth: 25     # frames (1 s) of smoothing on the mean player speed
 
 emission:
+  # rules = the hand-designed evidence below; learned = gradient-boosted trees trained on the
+  # external games (src/learned.py, src/train_learned.py; log E17). In learned mode only the
+  # Smart Tagging terms below are added on top; the rule parameters are then unused.
+  mode: learned
+  learned_model: src/learned_model.json
+  learned_dead_bias: 0.12     # nats added to D per frame; log E19 (best external held-out; ext D 24% vs ref 23%)
   # Logit of "home controls the ball" = (d_away - d_home) / dist_scale_m
   #                                     + crowd_beta * (n_home_R - n_away_R), clipped to max_logit.
   dist_scale_m: 1.5
@@ -82,6 +88,9 @@ tagging:
     DEFENDING IN ATTACKING THIRD: -0.06
     DEFENSIVE TRANSITION: -0.06
   phase_cap: 0.2              # |sum| of overlapping tags per frame is capped at this
+  # Learned emissions (log E17) put ~0.1x the H/A weight of the rule emissions on each frame;
+  # the phase prior is scaled by the same factor so it keeps its relative weight.
+  learned_phase_scale: 0.1
   team_name_overrides: {}     # e.g. {"Some Club": H} only if the fuzzy match fails (it errors)
   # Transitions: near the start of these tags a direct H<->A switch costs less.
   use_transition_hints: true
@@ -140,6 +149,11 @@ external:
     fill_clean_gaps: true        # fill the clean data's out-of-play ball gaps before degrading (else missing = dead leaks)
     fill_mode: linear            # linear (ball carried to the restart spot) | hold; log E12
     noise_smooth_frames: 50      # correlated noise (real ATD speeds look like clean tracking); log E12
+    # log E18: real ATD ball loss = ~150 long gaps per match. Deciles (0..100%) of the real gap
+    # lengths in frames -- an aggregate of the tracking, no labels. bursty = the E7-E17 benchmark.
+    ball_drop_mode: gaps
+    ball_gap_deciles_frames: [1, 11, 145, 169, 214, 268, 314, 485, 603, 845, 5537]
+    ball_jitter_m: 0.08          # i.i.d. ball jitter: still ball 4% vs real 5% (log E18)
 
 tuning:
   # Stage 5 coordinate search over external games only (src/tune.py). Coarse grids on purpose:

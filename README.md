@@ -1,9 +1,9 @@
-> ## Our submission: possession by duration-constrained Viterbi
+> ## Our submission: learned evidence + duration-constrained Viterbi
 >
-> This fork adds a possession model in `src/`: tracking features → per-frame evidence → H/A/D
-> Viterbi decoding with minimum durations, with Smart Tagging as soft evidence. Design, data
-> used and limitations: **[docs/TECHNICAL.md](docs/TECHNICAL.md)**. No match data is in this
-> repository.
+> This fork adds a possession model in `src/`: tracking features → gradient-boosted trees
+> (trained on external matches only) → per-frame evidence → H/A/D Viterbi decoding with minimum
+> durations, with Smart Tagging as soft evidence. Design, data used and limitations:
+> **[docs/TECHNICAL.md](docs/TECHNICAL.md)**. No match data is in this repository.
 >
 > ```bash
 > py -3.12 -m venv .venv            # Python 3.12; then activate it
@@ -14,11 +14,13 @@
 > python evaluation/validate_submission.py submissions/laninamal.csv
 > ```
 >
-> Team **laninamal**. Expected output SHA-256 starts with `7123da13a9da5a55`.
-> Parameters: `src/config.yaml`. Validation on other matches (Metrica Sports open sample data,
+> Team **laninamal**. Expected output SHA-256 starts with `5a558d91e4bdfd71`.
+> Parameters: `src/config.yaml`; the trained trees: `src/learned_model.json`.
+> Retrain them on other matches (Metrica Sports open sample data,
 > github.com/metrica-sports/sample-data, used with acknowledgement; download it into
-> `data_external/metrica/`): `python -m src.validate`, `python -m src.tune`.
-> Software tests on synthetic data: `python -m tests.test_synthetic`, `python -m tests.test_external`.
+> `data_external/metrica/`): `pip install -r requirements-train.txt` then
+> `python -m src.train_learned`. Software tests: `python -m tests.test_synthetic`,
+> `python -m tests.test_external`.
 
 # More than a Hack 2027 — Phase 1: Ball Possession
 

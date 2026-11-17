@@ -69,17 +69,25 @@ def compute(feat, cfg):
     # A fast-moving ball is in play.
     fast = np.nan_to_num(feat["ball_speed"], nan=0.0) > dc["ball_fast_mps"]
     E[fast & ~out, D] -= dc["w_fast_ball_alive"]
+    return add_tagging(E, feat, cfg)
+
+
+def add_tagging(E, feat, cfg, phase_scale=1.0):
+    """Smart Tagging terms, added in place to any (n, 3) emission matrix (absent on external games).
+
+    phase_scale rescales the team-phase prior so it keeps its weight relative to the tracking
+    evidence when the tracking emissions change scale (learned emissions, log E17)."""
     # Smart Tagging restarts (soft prior, approximate timing).
     sp = feat.get("set_piece_prior")
     if sp is not None:
-        E[:, D] += dc["w_set_piece"] * sp
+        E[:, D] += cfg["dead"]["w_set_piece"] * sp
 
     # Stage 3: Smart Tagging phases with a Team (+ = home has the ball). Split symmetrically so
     # it tilts H vs A without moving D on average. Capped so overlapping tags cannot dominate.
     tp = feat.get("team_phase_prior")
     if tp is not None:
         cap = cfg["tagging"]["phase_cap"]
-        t = np.clip(tp, -cap, cap)
+        t = phase_scale * np.clip(tp, -cap, cap)
         E[:, H] += 0.5 * t
         E[:, A] -= 0.5 * t
     return E
